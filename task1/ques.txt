@@ -1,0 +1,32 @@
+1-for each is an array method used to iterate the array and do something it 
+returns undefined and you can not break or continue the loop because it executes
+async we can use it if we need to do simple operations on array elements.
+-for of is a loop you can loop at any iterable values you can use break or 
+continue because it executes line by line and you can use await inside it
+it is more useful when you need more control.
+
+
+2- hoisting : is javaScript  mechanism of moving declarations to the
+ top of their scope during the creation phase, before code execution.
+ -temporary dead zone : is the time between entering a scope and initializing
+  a let or const variable, during which the variable cannot be accessed.
+
+
+3- the difference between == and === is that == compare values 
+while === compare values and data types
+
+
+4- try-catch is error handling mechanism used to catch and handle exception 
+without crashing the program. it is essential in async/await code because it 
+catches errors from rejected Promises and stop the promise or function work.
+
+
+5- type conversion means that you can convert from any to any type 
+in javaScript like:
+let x = 123;
+x=String(x);
+type coercion means that java script automatically convert types
+when executing code if needed like:
+let x = 10 * "10";
+the result will be 100
+
