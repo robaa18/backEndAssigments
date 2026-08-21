@@ -1,0 +1,27 @@
+{
+  "name": "task5",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "pro": "cross-env NODE_ENV=production node --watch main.js",
+    "dev": "cross-env NODE_ENV=development node --watch main.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "cross": "^1.0.0",
+    "dotenv": "^17.4.2",
+    "env": "^0.0.2",
+    "express": "^5.2.1",
+    "mysql2": "^3.23.3",
+    "sequelize": "^6.37.8"
+  },
+  "devDependencies": {
+    "cross-env": "^10.1.0"
+  }
+}

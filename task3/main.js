@@ -39,26 +39,26 @@ app.use(readFile);
 //  (ensure that the email of the new user doesn’t exist before)(1
 // Grades)
 // o URL: POST /user
-// app.post('/user', (req, res, next) => {
-//     //recieve the data from request 
-//     //read the file users.json
-//     //check the user does not exist
-//     //add the user
-//     console.log(req.body);
-//     const { email } = req.body;
-//     let found = users.find(user => user.email === email)
-//     if (found) {
-//         console.log('user found');
-//         res.status(409).json({ message: 'user alresdy exist' })
-//         return;
-//     }
-//     let id = 0;
-//     req.body.id = users.length + 1;
-//     users.push(req.body);
-//     writeFile();
-//     res.status(201).json({ message: "user added successfully" });
-//     return;
-// });
+app.post('/user', (req, res, next) => {
+    //recieve the data from request 
+    //read the file users.json
+    //check the user does not exist
+    //add the user
+    console.log(req.body);
+    const { email } = req.body;
+    let found = users.find(user => user.email === email)
+    if (found) {
+        console.log('user found');
+        res.status(409).json({ message: 'user alresdy exist' })
+        return;
+    }
+    let id = 0;
+    req.body.id = users.length + 1;
+    users.push(req.body);
+    writeFile();
+    res.status(201).json({ message: "user added successfully" });
+    return;
+});
 
 
 
@@ -67,25 +67,31 @@ app.use(readFile);
 // Note:Remember to update the corresponding values in the JSON file
 // o URL: PATCH /user/:id
 
-// app.patch('/user/:id', (req, res, next) => {
-//     //recieve the data from request 
-//     //read the file users.json
-//     //check the user exist
-//     //update user
-//     console.log(req.params);
-//     const { id } = req.params;
-//     let found = users.find(user => Number(user.id) === Number(id))
-//     console.log(found);
-//     if (!found) {
-//         res.status(404).json({ message: "user not found" });
-//         return;
-//     }
-//     Object.assign(found, req.body);
-//     console.log(users);
-
-//     res.json({ message: "user updated successfully" });
-//     return;
-// });
+app.patch('/user/:id', (req, res, next) => {
+    //recieve the data from request 
+    //read the file users.json
+    //check the user exist
+    //update user
+    console.log(req.params);
+    const { id } = req.params;
+    const { email } = req.body;
+    let found = users.find(user => Number(user.id) === Number(id))
+    console.log(found);
+    if (!found) {
+        res.status(404).json({ message: "user not found" });
+        return;
+    }
+    const emailExist = users.find(user => user.email === email);
+    if (emailExist) {
+        res.status(409).json({ message: "email exist" });
+        return;
+    }
+    Object.assign(found, req.body);
+    console.log(users);
+    writeFile();
+    res.json({ message: "user updated successfully" });
+    return;
+});
 
 
 
@@ -94,48 +100,48 @@ app.use(readFile);
 // Note: Remember to delete the user from the file
 // o URL: DELETE /user{/:id}
 
-// app.delete('/user{/:id}', (req, res, next) => {
-//     //recieve the data from request 
-//     //read the file users.json
-//     //check the user exist
-//     //delete user
-//     const { id } = req.params;
-//     let found = users.find(user => Number(user.id) === Number(id))
-//     console.log(found);
-//     if (!found) {
-//         res.status(404).json({ message: "user not found" });
-//         return;
-//     }
-//     let index = users.findIndex(user => user.id === Number(id));
-//     users.splice(index, 1);
-//     writeFile();
-//     res.json({ message: "user deleted successfully" });
-//     return;
-// });
+app.delete('/user{/:id}', (req, res, next) => {
+    //recieve the data from request 
+    //read the file users.json
+    //check the user exist
+    //delete user
+    const { id } = req.params||req.body.id;
+    let found = users.find(user => Number(user.id) === Number(id))
+    console.log(found);
+    if (!found) {
+        res.status(404).json({ message: "user not found" });
+        return;
+    }
+    let index = users.findIndex(user => user.id === Number(id));
+    users.splice(index, 1);
+    writeFile();
+    res.json({ message: "user deleted successfully" });
+    return;
+});
 
 
 // 4. Create an API that gets a user by their name. The name will be provided as a query parameter. (1 Grade)
 // o URL: GET /user/getByName
 
-// app.get('/user/getByName', (req, res, next) => {
-//     const { name } = req.query;
-//     let found = users.find(user => user.name === name);
-//     if (!found) {
-//         res.status(404).json({ message: "user not found" });
-//         return;
-//     }
-//     let people = users.filter(user => user.name === name);
-//     console.log(people);
-//     res.json({ users: people })
-// })
+app.get('/user/getByName', (req, res, next) => {
+    const { name } = req.query;
+    let found = users.find(user => user.name === name);
+    if (!found) {
+        res.status(404).json({ message: "user not found" });
+        return;
+    }
+    let people = users.filter(user => user.name === name);
+    console.log(people);
+    res.json({ users: people })
+})
 
 // 5. Create an API that gets all users from the JSON file. (0.5 Grade)
 // o URL: GET /user
 
-// app.get('/user', (req, res, next) => {
-//     return res.json({ users: users });
+app.get('/user', (req, res, next) => {
+    return res.json({ users: users });
 
-// })
+})
 
 // 6. Create an API that filters users by minimum age. (1 Grade)
 // o URL: GET /user/filter
@@ -156,17 +162,17 @@ app.get('/user/filter', (req, res, next) => {
 // o URL: GET /user/:id
 // o Output :
 
-// app.get('/user/:id', (req, res, next) => {
-//     const { id } = req.params;
-//     let found = users.find(user => Number(user.id) === Number(id))
-//     console.log(found);
-//     if (!found) {
-//         res.status(404).json({ message: "user not found" });
-//         return;
-//     }
-//     res.json({ users: found })
-//     return;
-// })
+app.get('/user/:id', (req, res, next) => {
+    const { id } = req.params;
+    let found = users.find(user => Number(user.id) === Number(id))
+    console.log(found);
+    if (!found) {
+        res.status(404).json({ message: "user not found" });
+        return;
+    }
+    res.json({ users: found })
+    return;
+})
 
 app.all('{/*dummy}', (req, res, next) => {
     res.status(404).json('invalid routing');
