@@ -1,0 +1,1 @@
+export {default as authRouter} from "./routes/authRouter.js"
