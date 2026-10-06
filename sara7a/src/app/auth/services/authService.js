@@ -1,12 +1,13 @@
 import { userRepo } from "../../user/repos/userRepo.js";
 import { otpRepo } from "../repos/otpRepo.js";
 import { sendEmail, toMs } from "../../../common/index.js";
+import { userExist, userNotFound } from "../errors.js";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 const registerService = async (inputs) => {
   //check user existance
   const exist = await userRepo.checkUserExistance(inputs.email);
-  if (exist) throw new Error("user already exist", { cause: { status: 409 } });
+  if (exist) throw userExist;
   //hash password
   inputs.password = await bcrypt.hash(inputs.password, 10);
   //save user
@@ -31,8 +32,7 @@ const registerService = async (inputs) => {
 const verifyAccount = async (inputs) => {
   //user existance
   const exist = await userRepo.checkUserExistance(inputs.email);
-  if (!exist)
-    throw new Error("user does not exist", { cause: { status: 404 } });
+  if (!exist) throw userNotFound;
   //isVerified
   if (exist.isVerified) {
     throw new Error("user already Vreified", { cause: { status: 409 } });
@@ -54,13 +54,11 @@ const verifyAccount = async (inputs) => {
 const loginService = async (inputs) => {
   //check user existance
   const exist = await userRepo.checkUserExistance(inputs.email);
-  if (!exist)
-    throw new Error("user does not exist", { cause: { status: 404 } });
+  if (!exist) throw userNotFound;
   //check user is verified
   if (!exist.isVerified) {
     throw new Error("user not Vreified", { cause: { status: 403 } });
     //token----
-    
   }
 };
 export const authService = { registerService, loginService, verifyAccount };
