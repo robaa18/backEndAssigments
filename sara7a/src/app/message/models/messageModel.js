@@ -25,4 +25,4 @@ const messageSchema = new Schema(
     timestamps: true,
   },
 );
-const Message = model("Message", messageSchema);
+export const Message = model("Message", messageSchema);

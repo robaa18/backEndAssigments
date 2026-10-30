@@ -3,6 +3,10 @@ const checkUserExistance = async (userEmail) => {
   const userExist = await User.findOne({ email: userEmail });
   return userExist;
 };
+const checkUserExistanceById = async (userId) => {
+  const userExist = await User.findOne({ _id: userId });
+  return userExist;
+};
 const createUser = async (userData) => {
   const user = await User.create(userData);
   return user;
@@ -13,4 +17,4 @@ const updateUserByEmail = async (email, data) => {
   });
   return user;
 };
-export const userRepo = { checkUserExistance, createUser, updateUserByEmail };
+export const userRepo = { checkUserExistance, createUser, updateUserByEmail ,checkUserExistanceById};

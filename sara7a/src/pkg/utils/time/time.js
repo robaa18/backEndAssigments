@@ -1,10 +1,10 @@
 export function toMs(time, unit) {
   switch (unit) {
-    case seconds:
+    case "seconds":
       return time * 1000;
-    case minutes:
+    case "minutes":
       return time * 60 * 1000;
-    case hours:
+    case "hours":
       return time * 60 * 60 * 1000;
     default:
       return time;
@@ -12,11 +12,11 @@ export function toMs(time, unit) {
 }
 export function toSeconds(time, unit) {
   switch (unit) {
-    case mSeconds:
+    case "mSeconds":
       return time / 1000;
-    case minutes:
+    case "minutes":
       return time * 60;
-    case hours:
+    case "hours":
       return time * 60 * 60;
     default:
       return time;

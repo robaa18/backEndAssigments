@@ -25,7 +25,7 @@ const userSchema = new Schema(
     },
     provider: {
       type: String,
-      enum: ["system", "google", "instagram"],
+      enum: ["system", "google", "facebook"],
       default: "system",
     },
     profilePic: {
