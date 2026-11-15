@@ -10,6 +10,21 @@ const saveUser = (user) => {
   sessionStorage.setItem('sara7a-user', JSON.stringify(user))
   return user
 }
+const profileKey = (email) => `sara7a-profile:${email?.trim().toLowerCase()}`
+const saveKnownProfile = (profile) => {
+  if (!profile?.email || !profile?.id) return
+  localStorage.setItem(profileKey(profile.email), JSON.stringify(profile))
+}
+const readKnownProfile = (email) => {
+  try { return JSON.parse(localStorage.getItem(profileKey(email))) } catch { return null }
+}
+const identityFromToken = (token) => {
+  try {
+    const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    const bytes = Uint8Array.from(atob(payload), (character) => character.charCodeAt(0))
+    return JSON.parse(new TextDecoder().decode(bytes))
+  } catch { return {} }
+}
 function useAuth() { return useContext(AuthContext) }
 
 export default function App() {
@@ -22,6 +37,7 @@ export default function App() {
       <Route path="/login" element={<AuthPage mode="login" />} />
       <Route path="/register" element={<AuthPage mode="register" />} />
       <Route path="/verify" element={<VerifyPage />} />
+      <Route path="/verify-login" element={<VerifyLoginPage />} />
       <Route path="/forgot-password" element={<ResetPage />} />
       <Route path="/dashboard" element={user ? <Dashboard /> : <Navigate to="/login" replace />} />
       <Route path="/u/:username" element={<PublicProfile />} />
@@ -59,12 +75,15 @@ function GoogleSignIn({ onSuccess, onError, disabled }) {
         callback: async ({ credential }) => {
           setSubmitting(true)
           try {
-            await authApi.google(credential)
+            const { data } = await authApi.google(credential)
             const encodedPayload = credential.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
             const binaryPayload = atob(encodedPayload)
             const bytes = Uint8Array.from(binaryPayload, (character) => character.charCodeAt(0))
             const identity = JSON.parse(new TextDecoder().decode(bytes))
-            onSuccess({ name: identity.name || identity.email?.split('@')[0] || 'Friend', email: identity.email })
+            const session = identityFromToken(data.data)
+            const user = { id: session.id, name: identity.name || session.name || identity.email?.split('@')[0] || 'Friend', email: identity.email }
+            saveKnownProfile(user)
+            onSuccess(user)
           } catch (error) {
             onError(error.message)
             setSubmitting(false)
@@ -128,11 +147,17 @@ function AuthPage({ mode }) {
     const form = Object.fromEntries(new FormData(event.currentTarget))
     try {
       if (isRegister) {
-        await authApi.register({ name: form.name, email: form.email, password: form.password })
+        const { data } = await authApi.register({ name: form.name, email: form.email, password: form.password })
+        saveKnownProfile(data.data)
         navigate(`/verify?email=${encodeURIComponent(form.email)}`, { state: { fresh: true } })
       } else {
-        await authApi.login({ email: form.email, password: form.password })
-        login({ name: form.email.split('@')[0], email: form.email })
+        const { data } = await authApi.login({ email: form.email, password: form.password })
+        if (data.message === 'enter your otp') {
+          navigate(`/verify-login?email=${encodeURIComponent(form.email)}`)
+          return
+        }
+        const knownProfile = readKnownProfile(form.email)
+        login(knownProfile || { name: form.email.split('@')[0], email: form.email })
         navigate('/dashboard')
       }
     } catch (err) { setError(err.message) } finally { setBusy(false) }
@@ -149,17 +174,41 @@ function VerifyPage() {
   const emailFromUrl = new URLSearchParams(location.search).get('email') || ''
   const [email, setEmail] = useState(emailFromUrl)
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [done, setDone] = useState(false)
-  const submit = async (event) => { event.preventDefault(); setBusy(true); setError(''); try { const code = new FormData(event.currentTarget).get('code'); await authApi.verify({ email, value: code }); setDone(true) } catch (err) { setError(err.message) } finally { setBusy(false) } }
+  const submit = async (event) => { event.preventDefault(); setBusy(true); setError(''); try { const code = new FormData(event.currentTarget).get('code'); const { data } = await authApi.verify({ email, value: code }); saveKnownProfile(data.data); setDone(true) } catch (err) { setError(err.message) } finally { setBusy(false) } }
   return <CenteredForm title="Verify your email" intro="Enter the six digit code we sent to your inbox." error={error}>
     {done ? <><Notice kind="success">Your account is verified. You can sign in now.</Notice><Link className="button button-link" to="/login">Continue to sign in ↗</Link></> : <form className="form-stack" onSubmit={submit}><Field label="Email address" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /><Field label="Verification code" name="code" inputMode="numeric" pattern="[0-9]{6}" minLength="6" maxLength="6" placeholder="000000" /><Button type="submit" busy={busy}>Verify account ↗</Button><button className="text-button" type="button" disabled={busy} onClick={async () => { setError(''); try { await authApi.sendOtp({ email }); setError('A new code has been sent.') } catch (err) { setError(err.message) } }}>Resend code</button></form>}
     <button className="text-button" onClick={() => navigate('/login')}>Back to sign in</button>
   </CenteredForm>
 }
 
+function VerifyLoginPage() {
+  const navigate = useNavigate()
+  const { login } = useAuth()
+  const email = new URLSearchParams(location.search).get('email') || ''
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const submit = async (event) => {
+    event.preventDefault(); setBusy(true); setError('')
+    try {
+      const value = new FormData(event.currentTarget).get('code')
+      await authApi.verifyTwoStep({ email, value })
+      login(readKnownProfile(email) || { email, name: email.split('@')[0] })
+      navigate('/dashboard')
+    } catch (err) { setError(err.message) } finally { setBusy(false) }
+  }
+  return <CenteredForm title="Two-step verification" intro={`Enter the verification code sent to ${email}.`} error={error}>
+    <form className="form-stack" onSubmit={submit}>
+      <Field label="Six digit code" name="code" inputMode="numeric" pattern="[0-9]{6}" minLength="6" maxLength="6" required placeholder="000000" />
+      <Button busy={busy}>Verify and sign in</Button>
+    </form>
+    <Link className="inline-link" to="/login">Back to sign in</Link>
+  </CenteredForm>
+}
+
 function ResetPage() {
   const [step, setStep] = useState(0); const [email, setEmail] = useState(''); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [done, setDone] = useState(false)
   const sendCode = async (event) => { event.preventDefault(); setBusy(true); setError(''); try { await authApi.sendOtp({ email }); setStep(1) } catch (err) { setError(err.message) } finally { setBusy(false) } }
-  const reset = async (event) => { event.preventDefault(); setBusy(true); setError(''); const form = new FormData(event.currentTarget); if (form.get('password') !== form.get('confirm')) { setError('The passwords do not match.'); setBusy(false); return } try { await authApi.resetPassword({ email, value: form.get('code'), password: form.get('password') }); setDone(true) } catch (err) { setError(err.message) } finally { setBusy(false) } }
+  const reset = async (event) => { event.preventDefault(); setBusy(true); setError(''); const form = new FormData(event.currentTarget); if (form.get('password') !== form.get('confirm')) { setError('The passwords do not match.'); setBusy(false); return } try { await authApi.forgotPassword({ email, value: form.get('code'), password: form.get('password') }); setDone(true) } catch (err) { setError(err.message) } finally { setBusy(false) } }
   return <CenteredForm title={done ? 'Password updated' : 'Reset your password'} intro={done ? 'Your new password is ready. Sign in to continue.' : step ? `Enter the code sent to ${email} and choose a new password.` : 'We will send a short verification code to your email.'} error={error}>{done ? <Link className="button button-link" to="/login">Back to sign in ↗</Link> : step ? <form className="form-stack" onSubmit={reset}><Field label="Six digit code" name="code" inputMode="numeric" pattern="[0-9]{6}" maxLength="6" required placeholder="000000" /><Field label="New password" name="password" type="password" minLength="6" required /><Field label="Confirm new password" name="confirm" type="password" minLength="6" required /><Button busy={busy}>Save new password ↗</Button></form> : <form className="form-stack" onSubmit={sendCode}><Field label="Email address" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="you@example.com" /><Button busy={busy}>Send reset code ↗</Button></form>}<Link className="inline-link" to="/login">Back to sign in</Link></CenteredForm>
 }
 
@@ -174,17 +223,15 @@ function Step({ number, title, body }) { return <article className="step"><span>
 
 function Dashboard() {
   const { user, logout } = useAuth(); const [messages, setMessages] = useState([]); const [error, setError] = useState(''); const [copied, setCopied] = useState(false); const [loading, setLoading] = useState(true)
-  const profileLink = `${location.origin}/u/${encodeURIComponent(user?.name || '')}`
-  const load = async () => { setLoading(true); setError(''); try { const { data } = await messagesApi.inbox(); setMessages(data.data?.messages ?? data.data ?? []) } catch (err) { setError(`${err.message} The messages API is not available yet.`) } finally { setLoading(false) } }
+  const profileLink = user?.id ? `${location.origin}/u/${encodeURIComponent(user.id)}` : ''
+  const load = async () => { setLoading(true); setError(''); try { const { data } = await messagesApi.inbox(); setMessages(Array.isArray(data.data) ? data.data : []) } catch (err) { setError(err.message) } finally { setLoading(false) } }
   useEffect(() => { load() }, [])
-  const copy = async () => { try { await navigator.clipboard.writeText(profileLink); setCopied(true); setTimeout(() => setCopied(false), 1800) } catch { setError('Could not copy link. Please copy it from the address field.') } }
-  return <div className="dashboard"><aside className="dash-sidebar"><Brand /><div className="side-label">YOUR SPACE</div><a className="side-item active" href="#inbox">◫ <span>Inbox</span><b>{messages.length}</b></a><a className="side-item" href="#share">↗ <span>Share your link</span></a><div className="sidebar-bottom"><div className="user-avatar">{user?.name?.[0]?.toUpperCase() || 'S'}</div><div className="user-meta"><strong>{user?.name}</strong><span>{user?.email}</span></div><button className="icon-button" onClick={logout} title="Sign out" aria-label="Sign out">↗</button></div></aside><main className="dash-main"><header className="dash-top"><div><span className="eyebrow">YOUR PRIVATE SPACE</span><h1>Hey, {user?.name} <span>✳</span></h1><p className="muted">Here’s what people are saying.</p></div><button className="button button-outline" onClick={load}>↻ <span>Refresh inbox</span></button></header><section className="share-card" id="share"><div className="share-icon">↗</div><div className="share-copy"><span className="eyebrow">YOUR PERSONAL LINK</span><p>{profileLink}</p></div><button className="button" onClick={copy}>{copied ? 'Copied ✓' : 'Copy link ↗'}</button></section><section className="inbox-section" id="inbox"><div className="section-heading"><div><span className="eyebrow">THE GOOD STUFF</span><h2>Your inbox <span className="count-pill">{messages.length}</span></h2></div><button className="quiet-link" onClick={load}>Refresh ↻</button></div><Notice>{error}</Notice>{loading ? <div className="empty-card">Loading your messages…</div> : messages.length ? <div className="message-list">{messages.map((message) => <article className="message-card" key={message._id}><div className="message-icon">✳</div><div className="message-content"><p>{message.content}</p><span>{new Date(message.createdAt).toLocaleString()}</span></div><span className="anonymous-tag">ANONYMOUS</span></article>)}</div> : <div className="empty-card"><span className="empty-flower">✳</span><h3>Your inbox is taking a breath.</h3><p>Share your link with friends. Their honest thoughts will show up here.</p><button className="button button-outline" onClick={copy}>{copied ? 'Copied ✓' : 'Copy your link ↗'}</button></div>}</section></main></div>
+  const copy = async () => { if (!profileLink) return; try { await navigator.clipboard.writeText(profileLink); setCopied(true); setTimeout(() => setCopied(false), 1800) } catch { setError('Could not copy link. Please copy it from the address field.') } }
+  return <div className="dashboard"><aside className="dash-sidebar"><Brand /><div className="side-label">YOUR SPACE</div><a className="side-item active" href="#inbox">◫ <span>Inbox</span><b>{messages.length}</b></a><a className="side-item" href="#share">↗ <span>Share your link</span></a><div className="sidebar-bottom"><div className="user-avatar">{user?.name?.[0]?.toUpperCase() || 'S'}</div><div className="user-meta"><strong>{user?.name}</strong><span>{user?.email}</span></div><button className="icon-button" onClick={logout} title="Sign out" aria-label="Sign out">↗</button></div></aside><main className="dash-main"><header className="dash-top"><div><span className="eyebrow">YOUR PRIVATE SPACE</span><h1>Hey, {user?.name} <span>✳</span></h1><p className="muted">Here’s what people are saying.</p></div><button className="button button-outline" onClick={load}>↻ <span>Refresh inbox</span></button></header><section className="share-card" id="share"><div className="share-icon">↗</div><div className="share-copy"><span className="eyebrow">YOUR PERSONAL LINK</span><p>{profileLink || 'Your account ID is unavailable in this browser. Sign up here to save your personal link.'}</p></div>{profileLink && <button className="button" onClick={copy}>{copied ? 'Copied ✓' : 'Copy link ↗'}</button>}</section><section className="inbox-section" id="inbox"><div className="section-heading"><div><span className="eyebrow">THE GOOD STUFF</span><h2>Your inbox <span className="count-pill">{messages.length}</span></h2></div><button className="quiet-link" onClick={load}>Refresh ↻</button></div><Notice>{error}</Notice>{loading ? <div className="empty-card">Loading your messages…</div> : messages.length ? <div className="message-list">{messages.map((message) => <article className="message-card" key={message._id}><div className="message-icon">✳</div><div className="message-content"><p>{message.content}</p><span>Received in your inbox</span></div><span className="anonymous-tag">{message.sender ? 'IDENTIFIED' : 'ANONYMOUS'}</span></article>)}</div> : <div className="empty-card"><span className="empty-flower">✳</span><h3>Your inbox is taking a breath.</h3><p>Share your link with friends. Their honest thoughts will show up here.</p>{profileLink && <button className="button button-outline" onClick={copy}>{copied ? 'Copied ✓' : 'Copy your link ↗'}</button>}</div>}</section></main></div>
 }
 
 function PublicProfile() {
-  const { username } = useParams(); const [profile, setProfile] = useState(null); const [content, setContent] = useState(''); const [error, setError] = useState(''); const [sent, setSent] = useState(false); const [busy, setBusy] = useState(false)
-  const load = async () => { try { const { data } = await messagesApi.publicProfile(username); setProfile(data.data?.user ?? data.data) } catch (err) { setError(`${err.message} Public profile lookup is not available yet.`) } }
-  useEffect(() => { load() }, [username])
-  const submit = async (event) => { event.preventDefault(); setBusy(true); setError(''); try { if (!profile?._id) throw new Error('This profile is not available yet.'); await messagesApi.send(profile._id, content); setSent(true); setContent('') } catch (err) { setError(`${err.message} Message sending is not available yet.`) } finally { setBusy(false) } }
-  return <div className="public-page"><header className="simple-header"><Brand /></header><main className="public-card"><span className="profile-avatar">{username?.[0]?.toUpperCase() || '✳'}</span><span className="eyebrow">A NOTE, JUST FOR THEM</span><h1>Send {profile?.name || username} an honest message.</h1><p className="muted">Your name won’t be attached. Say something kind, real, or both.</p>{sent ? <div className="sent-state"><span>✳</span><h2>Message sent.</h2><p>Thanks for sharing a little honesty.</p><button className="button button-outline" onClick={() => setSent(false)}>Send another</button></div> : <form className="form-stack" onSubmit={submit}><label className="field"><span>Your message</span><textarea value={content} onChange={(e) => setContent(e.target.value)} minLength="1" maxLength="200" required placeholder="Type something honest…" rows="5"/><small>{content.length}/200</small></label><Notice>{error}</Notice><Button busy={busy}>Send anonymously ↗</Button></form>}<span className="public-note">No account needed. Keep it kind.</span></main></div>
+  const { username: receiverId } = useParams(); const [content, setContent] = useState(''); const [error, setError] = useState(''); const [sent, setSent] = useState(false); const [busy, setBusy] = useState(false)
+  const submit = async (event) => { event.preventDefault(); setBusy(true); setError(''); try { await messagesApi.send(receiverId, content); setSent(true); setContent('') } catch (err) { setError(err.message) } finally { setBusy(false) } }
+  return <div className="public-page"><header className="simple-header"><Brand /></header><main className="public-card"><span className="profile-avatar">✳</span><span className="eyebrow">A NOTE, JUST FOR THEM</span><h1>Send an honest message.</h1><p className="muted">Your name won’t be attached. Say something kind, real, or both.</p>{sent ? <div className="sent-state"><span>✳</span><h2>Message sent.</h2><p>Thanks for sharing a little honesty.</p><button className="button button-outline" onClick={() => setSent(false)}>Send another</button></div> : <form className="form-stack" onSubmit={submit}><label className="field"><span>Your message</span><textarea value={content} onChange={(e) => setContent(e.target.value)} minLength="1" maxLength="200" required placeholder="Type something honest…" rows="5"/><small>{content.length}/200</small></label><Notice>{error}</Notice><Button busy={busy}>Send anonymously ↗</Button></form>}<span className="public-note">No account needed. Keep it kind.</span></main></div>
 }

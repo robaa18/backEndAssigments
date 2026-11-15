@@ -16,29 +16,34 @@ api.interceptors.response.use(
 export const authApi = {
   register: (data) => api.post('/auth/register', data),
   verify: (data) => api.patch('/auth/verify', data),
+  verifyTwoStep: (data) => api.patch('/auth/verify-2step-code', data),
   login: (data) => api.post('/auth/login', data),
   sendOtp: (data) => api.post('/auth/send-otp', data),
+  forgotPassword: (data) => api.patch('/auth/forget-password', data),
   resetPassword: (data) => api.patch('/auth/reset-password', data),
+  enableTwoStep: (data) => api.patch('/auth/enable-2step-verify', data),
   google: (credential) => api.post('/auth/google', { credential }),
 }
 
 export const messagesApi = {
   inbox: () => api.get('/messages'),
-  send: async (receiverId, content) => {
-    const message = typeof content === 'string'
-      ? { receiver: receiverId, content }
-      : { ...content, receiver: content?.receiver ?? receiverId }
+  send: (receiver, content) => api.post('/messages', { receiver, content }),
+  sendLogged: (receiver, content) => api.post('/messages/logged-public', { receiver, content }),
+}
 
-    try {
-      return await api.post('/messages', message)
-    } catch (error) {
-      if (!receiverId) throw error
-      const status = error?.response?.status
-      if (status === 404 || status === 405) {
-        return api.post(`/messages/${encodeURIComponent(receiverId)}`, { content: message.content })
-      }
-      throw error
-    }
+export const requestsApi = {
+  list: () => api.get('/request/requests'),
+  send: (message) => api.post('/request/send-request', { message }),
+  accept: (reqId) => api.patch('/request/accept-request', { reqId }),
+  reject: (reqId) => api.patch('/request/reject-request', { reqId }),
+}
+
+export const usersApi = {
+  uploadProfilePicture: (file) => {
+    const form = new FormData()
+    form.append('pp', file)
+    return api.post('/users/upload-pp', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
   },
-  publicProfile: (username) => api.get(`/users/${encodeURIComponent(username)}`),
 }
