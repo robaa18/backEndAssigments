@@ -35,7 +35,15 @@ const userSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    twoStepVerification: {
+      type: Boolean,
+      default: false,
+    },
     isDeleted: {
+      type: Boolean,
+      default: false,
+    },
+    isBanned: {
       type: Boolean,
       default: false,
     },

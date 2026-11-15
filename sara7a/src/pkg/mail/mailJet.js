@@ -1,8 +1,12 @@
-import { configExports } from "../../lib/index.js";
+import {
+  MAIL_JET_API_KEY,
+  MAIL_JET_API_SECRET,
+  ACCOUNT_MAIL,
+} from "../../lib/config/config.js";
 import Mailjet from "node-mailjet";
 const mailjet = new Mailjet({
-  apiKey: configExports.MAIL_JET_API_KEY,
-  apiSecret: configExports.MAIL_JET_API_SECRET,
+  apiKey: MAIL_JET_API_KEY,
+  apiSecret: MAIL_JET_API_SECRET,
 });
 export const sendEmail = async (to, subject, html) => {
   try {
@@ -10,7 +14,7 @@ export const sendEmail = async (to, subject, html) => {
       Messages: [
         {
           From: {
-            Email: configExports.ACCOUNT_MAIL,
+            Email: ACCOUNT_MAIL,
             Name: "Sara7aApp",
           },
           To: [

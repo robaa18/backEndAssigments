@@ -3,7 +3,7 @@ import dns from 'dns';
 import mongoose from "mongoose";
 import { app } from "./main.js";
 import { mongooseConnection } from "./lib/index.js";
-import {  logger } from "./index.js";
+import { logger } from "./index.js";
 import { internalServerError } from "./errors.js";
 dns.setServers(['8.8.8.8', '1.1.1.1']);
 const shutDown = (exitNumber, server) => {

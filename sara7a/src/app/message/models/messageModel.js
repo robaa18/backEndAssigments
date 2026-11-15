@@ -16,6 +16,10 @@ const messageSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: "User",
     },
+    isAnonymous: {
+      type: Boolean,
+      default: true,
+    },
     isDeleted: {
       type: Boolean,
       default: false,

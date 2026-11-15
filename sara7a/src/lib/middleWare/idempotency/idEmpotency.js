@@ -1,4 +1,4 @@
-import { AppError } from "../../../pkg/index.js";
+import AppError from "../../../pkg/errorHandling/appError.js";
 import { withCache } from "../cache/withCache.js";
 export const withIdempotency = (ttl = 3600) => {
   return async (req, res, next) => {

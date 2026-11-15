@@ -1,16 +1,46 @@
-import { AppError } from "../../../pkg/index.js";
+
+import { unauthorizedUser } from "../../../errors.js";
 import jwt from "jsonwebtoken";
+import { refreshUserToken } from "../../utils/securityUtils/refreshUserToken.js";
+import { validateRefreshToken } from "../../utils/securityUtils/validateRefreshToken.js";
 import { JWT_SECRET } from "../../config/config.js";
-export function authGuard(req, res, next) {
-  const token = req.cookies?.["access-token"];
-  if (!token) {
-    throw new AppError("unauthorized", 401);
-  }
+import { checkAccountIsBanned } from "../../userAccount/AccountBan.js";
+
+export async function authGuard(req, res, next) {
   try {
-    const payload =jwt.verify(token, JWT_SECRET);
+    const accessToken = req.cookies?.["access-token"];
+    const refreshToken = req.cookies?.["refresh-token"];
+
+    if (!accessToken) {
+      throw unauthorizedUser;
+    }
+
+    let payload;
+    let isAccessTokenExpired = false;
+
+    try {
+      payload = jwt.verify(accessToken, JWT_SECRET);
+    } catch (err) {
+      if (!(err instanceof jwt.TokenExpiredError)) {
+        throw unauthorizedUser;
+      }
+
+      payload = validateRefreshToken(refreshToken);
+      isAccessTokenExpired = true;
+    }
+
+    // Check account status before continuing
+    await checkAccountIsBanned(payload.id);
+
     req.user = payload;
-    next();
-  } catch (err) {
-    throw new AppError("unauthorized", 401);
+
+    if (isAccessTokenExpired) {
+      await refreshUserToken(payload, res);
+    }
+
+    return next();
+
+  } catch (error) {
+    return next(error);
   }
 }

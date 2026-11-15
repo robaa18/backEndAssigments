@@ -21,6 +21,16 @@ authRouter.patch(
   validateDto(verifyAccountDto),
   authController.VerifyAccount,
 );
+authRouter.patch(
+  "/enable-2step-verify",
+  validateDto(verifyAccountDto),
+  authController.enableTwoStepVerficationController,
+);
+authRouter.patch(
+  "/verify-2step-code",
+  validateDto(verifyAccountDto),
+  authController.verifyTwoStepVerficationCodeController,
+);
 authRouter.post("/login", validateDto(loginDto), authController.loginController);
 authRouter.post(
   "/send-otp",
